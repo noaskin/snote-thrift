@@ -71,32 +71,31 @@ public class ThriftClient {
 	public static void main(String[] args) {
 		try {
 			TProtocolFactory protocolFactory = new TBinaryProtocol.Factory();
-			TAsyncClientManager clientManager = new TAsyncClientManager();
-			TNonblockingSocket transport = new TNonblockingSocket("localhost", 9090);
-			TestService.AsyncClient client = new TestService.AsyncClient(protocolFactory, clientManager, transport);
-			
-			Test test = new Test();
-			test.setBool_(true);
-			test.setI8_((byte) 1);
-			test.setI16_((short) 2);
-			test.setI32_(3);
-			test.setI64_(4L);
-			test.setDouble_(5.0);
-			test.setString_("abc");
-			test.setBinary_("abc".getBytes());			
-			
-			CountDownLatch latch = new CountDownLatch(1);
-			client.getBool(test, new AsynCallback(latch));
+            TAsyncClientManager clientManager = new TAsyncClientManager();
+            TNonblockingSocket transport = new TNonblockingSocket("localhost", 9090);
+            TestService.AsyncClient client = new TestService.AsyncClient(protocolFactory, clientManager, transport);
 
-			boolean wait;			
-			try {
-				wait = latch.await(1, TimeUnit.SECONDS);
-				System.out.println("latch.await =:" + wait); 
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}  
-		
-			transport.close();
+            Test test = new Test();
+            test.setBool_(true);
+            test.setByte_((byte) 1);
+            test.setI16_((short) 2);
+            test.setI32_(3);
+            test.setI64_(4L);
+            test.setDouble_(5.0);
+            test.setString_("abc");
+            test.setBinary_("abc".getBytes());
+
+            CountDownLatch latch = new CountDownLatch(1);
+            client.getBool(test, new AsynCallback(latch));
+
+            boolean wait;
+            try {
+                wait = latch.await(1, TimeUnit.SECONDS);
+                System.out.println("latch.await =:" + wait);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            transport.close();
 			
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -112,7 +111,6 @@ public class ThriftClient {
 Client端：
 
 ```text
-Received 0
 onComplete
 AsynCall result =:true
 latch.await =:true
@@ -512,12 +510,14 @@ TestServiceImpl.getBool() + true
 
 # 上面代码接口的编写：
 
-testService.thrift
+## testService.thrift
 
 ```thrift
+namespace java com.thrift.example.server
+
 struct Test {
   1: required bool bool_; //required 必须填充也必须序列化
-  2: optional i8 i8_; //optional 不填充则不序列化
+  2: optional byte byte_; //optional 不填充则不序列化
   3: i16 i16_;
   4: i32 i32_;
   5: i64 i64_;
@@ -530,12 +530,45 @@ struct Test {
 service TestService {
   void getVoid(1:Test test);
   bool getBool(1:Test test);
-  i8 getI8(1:Test test);
+  byte getByte(1:Test test);
   i16 getI16(1:Test test);
   i32 getI32(1:Test test);
   i64 getI64(1:Test test);
   double getDouble(1:Test test);
   string getString(1:Test test);
   binary getBinary(1:Test test);
+}
+```
+
+## AsynCallback
+
+```java
+public class AsynCallback implements AsyncMethodCallback<TestService.AsyncClient.getBool_call> {
+    private CountDownLatch latch;
+
+    public AsynCallback(CountDownLatch latch) {
+        this.latch = latch;
+    }
+
+    @Override
+    public void onComplete(TestService.AsyncClient.getBool_call response) {
+        System.out.println("onComplete");
+        try {
+            //TimeUnit.SECONDS.sleep(10);
+            System.out.println("AsynCall result =:" + response.getResult());
+        } catch (TException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            latch.countDown();
+        }
+    }
+
+    @Override
+    public void onError(Exception exception) {
+        System.out.println("onError :" + exception.getMessage());
+        latch.countDown();
+    }
 }
 ```
